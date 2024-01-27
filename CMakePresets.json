@@ -1,0 +1,52 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Default (Release) configuration",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "BUILD_SHARED_LIBS": "OFF",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64",
+                "TRACY_CALLSTACK": "ON",
+                "TRACY_FIBERS": "ON"
+            },
+            "warnings": {
+                "dev": false
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug configuration",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "displayName": "Default (Release) configuration",
+            "configurePreset": "default",
+            "configuration": "Release",
+            "jobs": 8,
+            "targets": [
+                "vox"
+            ]
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug configuration",
+            "inherits": "default",
+            "configurePreset": "debug",
+            "configuration": "Debug"
+        }
+    ]
+}
