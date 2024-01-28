@@ -50,3 +50,7 @@ foreach(VENDORDEP ${VENDORDEPS})
 
     set_target_properties(${VENDORDEP} PROPERTIES FOLDER ${FOLDER_NAME})
 endforeach()
+
+if(MSVC)
+    set_directory_properties(PROPERTIES VS_STARTUP_PROJECT vox)
+endif()

@@ -27,7 +27,9 @@ target_compile_definitions(vox PUBLIC ${VOX_DEFINITIONS} $<$<CONFIG:Debug>:VOX_D
 
 set_target_properties(vox PROPERTIES
     CXX_STANDARD 20
-    FOLDER "vox")
+    FOLDER "vox"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(VOX_PCH "${VOX_SOURCE_DIR}/voxpch.h")
 target_precompile_headers(vox PRIVATE ${VOX_PCH})
