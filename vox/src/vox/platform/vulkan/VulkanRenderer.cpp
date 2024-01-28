@@ -30,6 +30,8 @@ namespace vox {
 
     VulkanRenderer::VulkanRenderer() {
         ZoneScopedVulkan;
+        spdlog::info("Initializing Vulkan renderer");
+
         if (s_Instance != nullptr) {
             throw std::runtime_error("A Vulkan renderer has already been created!");
         }
@@ -40,12 +42,19 @@ namespace vox {
         }
 
         CreateInstance();
+        CreateDebugMessenger();
 
         m_ProfilerContext = nullptr;
+
+        spdlog::info("Vulkan renderer initialized");
     }
 
     VulkanRenderer::~VulkanRenderer() {
         ZoneScopedVulkan;
+
+        if (m_DebugMessenger != nullptr) {
+            vkDestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
+        }
 
         vkDestroyInstance(m_Instance, nullptr);
     }
@@ -92,38 +101,55 @@ namespace vox {
     void VulkanRenderer::CreateInstance() {
         ZoneScopedVulkan;
 
-        std::vector<std::string> windowExtensions;
-        const auto& window = Application::Get().GetWindow();
-        window->GetRequiredVulkanExtensions(windowExtensions);
-
         std::vector<VulkanExtension> requested(s_InstanceExtensions);
-        for (const auto& name : windowExtensions) {
-            requested.push_back({ name, true });
-        }
-
-        uint32_t count;
-        if (vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to enumerate instance extensions!");
-        }
-
-        std::vector<VkExtensionProperties> availableExtensions(count);
-        vkEnumerateInstanceExtensionProperties(nullptr, &count, availableExtensions.data());
-
-        if (vkEnumerateInstanceLayerProperties(&count, nullptr) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to enumerate instance layers!");
-        }
-
-        std::vector<VkLayerProperties> availableLayers(count);
-        vkEnumerateInstanceLayerProperties(&count, availableLayers.data());
-
         std::vector<const char*> extensions, layers;
-        CompareVulkanExtensions<VkExtensionProperties>(
-            availableExtensions, requested, extensions,
-            [](const auto& extension) { return std::string(extension.extensionName); });
 
-        CompareVulkanExtensions<VkLayerProperties>(
-            availableLayers, s_InstanceLayers, layers,
-            [](const auto& layer) { return std::string(layer.layerName); });
+        {
+            ZoneScopedNC("Parse extensions and layers", VulkanProfilerColor);
+
+            {
+                ZoneScopedNC("Query window surface extensions", VulkanProfilerColor);
+
+                std::vector<std::string> windowExtensions;
+                const auto& window = Application::Get().GetWindow();
+                window->GetRequiredVulkanExtensions(windowExtensions);
+
+                for (const auto& name : windowExtensions) {
+                    requested.push_back({ name, true });
+                }
+            }
+
+            std::vector<VkExtensionProperties> availableExtensions;
+            std::vector<VkLayerProperties> availableLayers;
+
+            {
+                ZoneScopedNC("Query Vulkan for layers and extensions", VulkanProfilerColor);
+
+                uint32_t count;
+                if (vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr) !=
+                    VK_SUCCESS) {
+                    throw std::runtime_error("Failed to enumerate instance extensions!");
+                }
+
+                availableExtensions.resize(count);
+                vkEnumerateInstanceExtensionProperties(nullptr, &count, availableExtensions.data());
+
+                if (vkEnumerateInstanceLayerProperties(&count, nullptr) != VK_SUCCESS) {
+                    throw std::runtime_error("Failed to enumerate instance layers!");
+                }
+
+                availableLayers.resize(count);
+                vkEnumerateInstanceLayerProperties(&count, availableLayers.data());
+            }
+
+            CompareVulkanExtensions<VkExtensionProperties>(
+                availableExtensions, requested, extensions,
+                [](const auto& extension) { return std::string(extension.extensionName); });
+
+            CompareVulkanExtensions<VkLayerProperties>(
+                availableLayers, s_InstanceLayers, layers,
+                [](const auto& layer) { return std::string(layer.layerName); });
+        }
 
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -141,6 +167,40 @@ namespace vox {
 
         if (vkCreateInstance(&createInfo, nullptr, &m_Instance) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create Vulkan instance!");
+        }
+
+        volkLoadInstance(m_Instance);
+    }
+
+    void VulkanRenderer::CreateDebugMessenger() {
+        ZoneScopedVulkan;
+
+        PFN_vkCreateDebugUtilsMessengerEXT createDebugMessenger = nullptr;
+#ifdef VOX_DEBUG
+        createDebugMessenger = vkCreateDebugUtilsMessengerEXT;
+#endif
+
+        if (vkCreateDebugUtilsMessengerEXT == nullptr) {
+            m_DebugMessenger = nullptr;
+            return;
+        }
+
+        VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        createInfo.pfnUserCallback = VulkanValidationCallback;
+        createInfo.pUserData = this;
+
+        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+
+        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+        if (createDebugMessenger(m_Instance, &createInfo, nullptr, &m_DebugMessenger) !=
+            VK_SUCCESS) {
+            m_DebugMessenger = nullptr;
+            spdlog::error(
+                "Failed to create Vulkan debug messenger - validation errors will not show");
         }
     }
 } // namespace vox

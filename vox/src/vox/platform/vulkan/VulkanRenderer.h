@@ -17,8 +17,10 @@ namespace vox {
 
     private:
         void CreateInstance();
+        void CreateDebugMessenger();
 
         VkInstance m_Instance;
+        VkDebugUtilsMessengerEXT m_DebugMessenger;
         TracyVkCtx m_ProfilerContext;
     };
 } // namespace vox

@@ -23,7 +23,7 @@ endif()
 add_executable(vox ${VOX_SOURCE})
 target_link_libraries(vox PUBLIC ${VOX_LIBS})
 target_include_directories(vox PUBLIC ${VOX_INCLUDES})
-target_compile_definitions(vox PUBLIC ${VOX_DEFINITIONS})
+target_compile_definitions(vox PUBLIC ${VOX_DEFINITIONS} $<$<CONFIG:Debug>:VOX_DEBUG>)
 
 set_target_properties(vox PROPERTIES
     CXX_STANDARD 20
