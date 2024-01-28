@@ -1,18 +1,18 @@
-#include <spdlog/spdlog.h>
-#include <tracy/Tracy.hpp>
-#include <thread>
+#include "voxpch.h"
+#include "vox/core/Application.h"
 
 int main(int argc, const char** argv) {
+    tracy::SetThreadName("Vox main thread");
     ZoneScoped;
-    spdlog::info("Hello");
 
-    while (true) {
-        ZoneScopedN("Loop");
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-
-        spdlog::info("Frame");
-        FrameMark;
+    std::vector<std::string> args;
+    for (int i = 0; i < argc; i++) {
+        args.push_back(argv[i]);
     }
 
-    return 0;
+    vox::Application::Create(args);
+    int retval = vox::Application::Get().Run();
+
+    vox::Application::Destroy();
+    return retval;
 }

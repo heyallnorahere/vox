@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 3.21)
 project(vox CXX C)
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL Windows)
+    list(APPEND VOX_PLATFORMS windows)
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL Linux)
+    list(APPEND VOX_PLATFORMS linux)
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
+    list(APPEND VOX_PLATFORMS osx)
+endif()
+
+set(DESKTOP_PLATFORMS Windows Linux Darwin)
+list(FIND DESKTOP_PLATFORMS ${CMAKE_SYSTEM_NAME} PLATFORM_INDEX)
+if(${PLATFORM_INDEX} GREATER_EQUAL 0)
+    list(APPEND VOX_PLATFORMS desktop)
+endif()
+
 add_subdirectory("vendor")
 add_subdirectory("vox")
 
