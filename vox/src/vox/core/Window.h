@@ -10,6 +10,9 @@ namespace vox {
 
         virtual void Update() = 0;
 
+        virtual void GetRequiredVulkanExtensions(std::vector<std::string>& extensions) const = 0;
+        virtual void* CreateVulkanSurface(void* instance) const = 0;
+
         virtual bool ShouldClose() const = 0;
         virtual uint32_t GetWidth() const = 0;
         virtual uint32_t GetHeight() const = 0;

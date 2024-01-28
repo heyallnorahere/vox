@@ -1,5 +1,7 @@
-#include "vox/core/Application.h"
 #include "voxpch.h"
+#include "vox/core/Application.h"
+
+#include "vox/renderer/Graphics.h"
 
 namespace vox {
     static std::unique_ptr<Application> s_Instance;
@@ -23,18 +25,19 @@ namespace vox {
     Application::~Application() {
         ZoneScoped;
 
-        // todo: if necessary, explicitly release any resources
+        Graphics::Shutdown();
     }
 
     int Application::Run() {
-        ZoneScoped;
+        ZoneScopedC(tracy::Color::Grey30);
         if (m_Running) {
             spdlog::warn("Attempted to start application twice!");
             return 0;
         }
 
-        spdlog::info("Starting application...");
+        spdlog::info("Starting application!");
         m_Running = true;
+
         while (!m_Window->ShouldClose()) {
             ZoneScopedN("Game loop");
 
@@ -47,6 +50,7 @@ namespace vox {
 
         spdlog::info("Stopping!");
         m_Running = false;
+
         return 0;
     }
 
@@ -64,6 +68,8 @@ namespace vox {
         // maybe select gpu?
 
         m_Window = Window::Create("vox", 1600, 900);
+        Graphics::Init(Renderer::API::Vulkan); // todo: use most stable api?
+
         spdlog::info("Application initialized!");
     }
 } // namespace vox

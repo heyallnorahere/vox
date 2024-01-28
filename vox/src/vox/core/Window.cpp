@@ -1,5 +1,5 @@
-#include "vox/core/Window.h"
 #include "voxpch.h"
+#include "vox/core/Window.h"
 
 #ifdef VOX_PLATFORM_desktop
 #include "vox/platform/desktop/DesktopWindow.h"

@@ -10,6 +10,9 @@ namespace vox {
 
         virtual void Update() override;
 
+        virtual void GetRequiredVulkanExtensions(std::vector<std::string>& extensions) const override;
+        virtual void* CreateVulkanSurface(void* instance) const override;
+
         virtual bool ShouldClose() const override;
         virtual uint32_t GetWidth() const override;
         virtual uint32_t GetHeight() const override;

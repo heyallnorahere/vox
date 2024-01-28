@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(vox CXX C)
 
+set(VOX_PLATFORMS vulkan)
 if(${CMAKE_SYSTEM_NAME} STREQUAL Windows)
     list(APPEND VOX_PLATFORMS windows)
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL Linux)
@@ -14,6 +15,15 @@ list(FIND DESKTOP_PLATFORMS ${CMAKE_SYSTEM_NAME} PLATFORM_INDEX)
 if(${PLATFORM_INDEX} GREATER_EQUAL 0)
     list(APPEND VOX_PLATFORMS desktop)
 endif()
+
+function(check_platform_support PLATFORM_NAME OUTPUT)
+    list(FIND VOX_PLATFORMS ${PLATFORM_NAME} INDEX)
+    if(${INDEX} GREATER_EQUAL 0) # \_(ツ)_/
+        set(${OUTPUT} ON PARENT_SCOPE)
+    else()
+        set(${OUTPUT} OFF PARENT_SCOPE)
+    endif()
+endfunction()
 
 add_subdirectory("vendor")
 add_subdirectory("vox")

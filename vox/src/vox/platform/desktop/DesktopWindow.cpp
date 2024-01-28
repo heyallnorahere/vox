@@ -1,6 +1,7 @@
-#include "vox/platform/desktop/DesktopWindow.h"
 #include "voxpch.h"
+#include "vox/platform/desktop/DesktopWindow.h"
 
+#include "vox/platform/vulkan/VulkanBase.h"
 #include <GLFW/glfw3.h>
 
 namespace vox {
@@ -54,6 +55,30 @@ namespace vox {
     void DesktopWindow::Update() {
         ZoneScoped;
         glfwPollEvents();
+    }
+
+    void DesktopWindow::GetRequiredVulkanExtensions(std::vector<std::string>& extensions) const {
+        extensions.clear();
+        if (!glfwVulkanSupported()) {
+            return;
+        }
+
+        uint32_t count;
+        const char** names = glfwGetRequiredInstanceExtensions(&count);
+
+        for (uint32_t i = 0; i < count; i++) {
+            extensions.push_back(names[i]);
+        }
+    }
+
+    void* DesktopWindow::CreateVulkanSurface(void* instance) const {
+        VkSurfaceKHR surface;
+        if (glfwCreateWindowSurface((VkInstance)instance, m_Window, nullptr, &surface) !=
+            VK_SUCCESS) {
+            surface = nullptr;
+        }
+
+        return surface;
     }
 
     bool DesktopWindow::ShouldClose() const {

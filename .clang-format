@@ -2,7 +2,7 @@ BasedOnStyle: Microsoft
 NamespaceIndentation: All
 ColumnLimit: 100
 AccessModifierOffset: -4
-SortIncludes: true
+SortIncludes: false
 PointerAlignment: Left
 AllowShortFunctionsOnASingleLine: All
 Cpp11BracedListStyle: false

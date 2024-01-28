@@ -15,6 +15,11 @@ foreach(PLATFORM ${VOX_PLATFORMS})
     list(APPEND VOX_DEFINITIONS VOX_PLATFORM_${PLATFORM})
 endforeach()
 
+check_platform_support(vulkan VULKAN_SUPPORTED)
+if(VULKAN_SUPPORTED)
+    list(APPEND VOX_LIBS volk)
+endif()
+
 add_executable(vox ${VOX_SOURCE})
 target_link_libraries(vox PUBLIC ${VOX_LIBS})
 target_include_directories(vox PUBLIC ${VOX_INCLUDES})
