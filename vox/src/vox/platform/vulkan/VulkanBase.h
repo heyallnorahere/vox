@@ -11,23 +11,8 @@
 namespace vox {
     constexpr uint32_t VulkanProfilerColor = tracy::Color::Red4;
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanValidationCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-        ZoneScopedVulkan;
-
-        spdlog::level::level_enum level;
-        switch (messageSeverity) {
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            level = spdlog::level::warn;
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            level = spdlog::level::err;
-            break;
-        }
-
-        spdlog::log(level, "Vulkan: {}", pCallbackData->pMessage);
-        return VK_FALSE;
-    }
+    struct VulkanExtension {
+        std::string Name;
+        bool Required;
+    };
 } // namespace vox

@@ -35,7 +35,7 @@ namespace vox {
             return 0;
         }
 
-        spdlog::info("Starting application!");
+        spdlog::info("Starting application");
         m_Running = true;
 
         while (!m_Window->ShouldClose()) {
@@ -70,6 +70,6 @@ namespace vox {
         m_Window = Window::Create("vox", 1600, 900);
         Graphics::Init(Renderer::API::Vulkan); // todo: use most stable api?
 
-        spdlog::info("Application initialized!");
+        spdlog::info("Application initialized");
     }
 } // namespace vox

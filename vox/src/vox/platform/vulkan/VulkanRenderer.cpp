@@ -5,10 +5,76 @@
 #include "vox/core/Application.h"
 
 namespace vox {
-    struct VulkanExtension {
-        std::string Name;
-        bool Required;
-    };
+    static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanValidationCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+        ZoneScopedVulkan;
+
+        std::optional<spdlog::level::level_enum> level;
+        switch (messageSeverity) {
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+            level = spdlog::level::warn;
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+            level = spdlog::level::err;
+            break;
+        }
+
+        if (level.has_value()) {
+            spdlog::log(level.value(), "Vulkan: {}", pCallbackData->pMessage);
+        }
+
+        return VK_FALSE;
+    }
+
+    static uint32_t ScoreDevice(VkPhysicalDevice device,
+                                const std::vector<VulkanExtension>& requestedExtensions) {
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(device, &properties);
+
+        VkPhysicalDeviceFeatures features;
+        vkGetPhysicalDeviceFeatures(device, &features);
+
+        uint32_t extensionCount = 0;
+        if (vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr) !=
+            VK_SUCCESS) {
+            spdlog::info("Failed to enumerate extensions for device {} - skipping",
+                         properties.deviceName);
+
+            return 0;
+        }
+
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensions.data());
+
+        uint32_t score = 0;
+        if (features.geometryShader) {
+            score += 8000;
+        }
+
+        if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            score += 5000;
+        }
+
+        for (const auto& requested : requestedExtensions) {
+            bool found = false;
+            for (const auto& extension : extensions) {
+                if (requested.Name == extension.extensionName) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found && !requested.Required) {
+                score += 1000;
+            } else if (requested.Required && !found) {
+                return 0;
+            }
+        }
+
+        return score;
+    }
 
     static std::vector<VulkanExtension> s_InstanceExtensions = {
         { "VK_KHR_get_physical_device_properties2", false }, { "VK_EXT_debug_utils", false }
@@ -28,6 +94,31 @@ namespace vox {
     static VulkanRenderer* s_Instance;
     VulkanRenderer* VulkanRenderer::GetRenderer() { return s_Instance; }
 
+    VkPhysicalDevice VulkanRenderer::ChoosePhysicalDevice(VkInstance instance) {
+        ZoneScopedVulkan;
+
+        uint32_t deviceCount = 0;
+        if (vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to enumerate physical devices!");
+        }
+
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+        uint32_t selectedScore = 0;
+        VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
+
+        for (VkPhysicalDevice device : devices) {
+            uint32_t score = ScoreDevice(device, s_DeviceExtensions);
+            if (score > selectedScore) {
+                selectedScore = score;
+                selectedDevice = device;
+            }
+        }
+
+        return selectedDevice;
+    }
+
     VulkanRenderer::VulkanRenderer() {
         ZoneScopedVulkan;
         spdlog::info("Initializing Vulkan renderer");
@@ -43,6 +134,16 @@ namespace vox {
 
         CreateInstance();
         CreateDebugMessenger();
+        CreateDevice();
+
+        if (m_Device) {
+            VkPhysicalDeviceProperties properties;
+            vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &properties);
+
+            spdlog::info("Chose Vulkan device: {}", properties.deviceName);
+        } else {
+            throw std::runtime_error("No viable Vulkan device found!");
+        }
 
         m_ProfilerContext = nullptr;
 
@@ -52,7 +153,9 @@ namespace vox {
     VulkanRenderer::~VulkanRenderer() {
         ZoneScopedVulkan;
 
-        if (m_DebugMessenger != nullptr) {
+        m_Device.Reset();
+
+        if (m_DebugMessenger != VK_NULL_HANDLE) {
             vkDestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
         }
 
@@ -181,7 +284,7 @@ namespace vox {
 #endif
 
         if (vkCreateDebugUtilsMessengerEXT == nullptr) {
-            m_DebugMessenger = nullptr;
+            m_DebugMessenger = VK_NULL_HANDLE;
             return;
         }
 
@@ -198,9 +301,45 @@ namespace vox {
 
         if (createDebugMessenger(m_Instance, &createInfo, nullptr, &m_DebugMessenger) !=
             VK_SUCCESS) {
-            m_DebugMessenger = nullptr;
+            m_DebugMessenger = VK_NULL_HANDLE;
             spdlog::error(
                 "Failed to create Vulkan debug messenger - validation errors will not show");
         }
+    }
+
+    void VulkanRenderer::CreateDevice() {
+        ZoneScopedVulkan;
+
+        VkPhysicalDevice selectedDevice = ChoosePhysicalDevice(m_Instance);
+        if (selectedDevice == VK_NULL_HANDLE) {
+            return;
+        }
+
+        // todo: find present queue
+        std::unordered_map<GraphicsQueueType::QueueType, uint32_t> foundFamilies;
+        if (!VulkanDevice::FindQueueFamilies({ /* GraphicsQueueType::Present */ }, foundFamilies,
+                                             selectedDevice)) {
+            throw std::runtime_error("Failed to find present queue!");
+        }
+
+        std::unordered_set<uint32_t> additionalFamilies;
+        for (const auto& [type, index] : foundFamilies) {
+            additionalFamilies.insert(index);
+        }
+
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(selectedDevice, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(selectedDevice, nullptr, &extensionCount,
+                                             availableExtensions.data());
+
+        std::vector<const char*> extensions;
+        CompareVulkanExtensions<VkExtensionProperties>(
+            availableExtensions, s_DeviceExtensions, extensions,
+            [](const auto& extension) { return std::string(extension.extensionName); });
+
+        m_Device = Ref<VulkanDevice>::Create(selectedDevice, extensions, additionalFamilies);
+        volkLoadDevice(m_Device->GetDevice());
     }
 } // namespace vox

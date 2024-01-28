@@ -8,6 +8,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <cstdint>
 #include <stddef.h>
