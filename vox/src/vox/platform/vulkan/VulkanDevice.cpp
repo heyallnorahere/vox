@@ -83,21 +83,25 @@ namespace vox {
         return false;
     }
 
-    VulkanDevice::VulkanDevice(VkPhysicalDevice device,
-                               const std::vector<const char*>& requestedExtensions,
-                               const std::unordered_set<uint32_t>& requestedQueues) {
+    VulkanDevice::VulkanDevice(VkPhysicalDevice device, VkSurfaceKHR surface,
+                               const std::vector<const char*>& requestedExtensions) {
         ZoneScopedVulkan;
-        static std::unordered_set<GraphicsQueueType::QueueType> requestedFamilies = {
+        std::unordered_set<GraphicsQueueType::QueueType> requestedFamilies = {
             GraphicsQueueType::Graphics, GraphicsQueueType::Transfer, GraphicsQueueType::Compute
         };
 
+        if (surface != VK_NULL_HANDLE) {
+            requestedFamilies.insert(GraphicsQueueType::Present);
+        }
+
         m_PhysicalDevice = device;
-        if (!FindQueueFamilies(requestedFamilies, m_QueueFamilies, m_PhysicalDevice)) {
+        std::unordered_map<GraphicsQueueType::QueueType, uint32_t> queueFamilies;
+        if (!FindQueueFamilies(requestedFamilies, queueFamilies, m_PhysicalDevice, surface)) {
             spdlog::warn("Not all device queue families were found!");
         }
 
-        std::unordered_set<uint32_t> createdQueues(requestedQueues);
-        for (const auto& [type, index] : m_QueueFamilies) {
+        std::unordered_set<uint32_t> createdQueues;
+        for (const auto& [type, index] : queueFamilies) {
             createdQueues.insert(index);
         }
 
@@ -155,11 +159,43 @@ namespace vox {
         if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create Vulkan device!");
         }
+
+        std::unordered_map<uint32_t, GraphicsQueueType::Flags> familyUsage;
+        for (const auto& [usage, family] : queueFamilies) {
+            familyUsage[family] |= usage;
+        }
+
+        for (const auto& [family, usage] : familyUsage) {
+            m_Queues[family] = std::make_unique<VulkanQueue>(m_Device, family, usage);
+        }
     }
 
     VulkanDevice::~VulkanDevice() {
-        // todo: release more references
-
+        m_Queues.clear();
         vkDestroyDevice(m_Device, nullptr);
+    }
+
+    bool VulkanDevice::HasQueue(GraphicsQueueType::Flags flags) {
+        ZoneScopedVulkan;
+
+        for (const auto& [usage, queue] : m_Queues) {
+            if ((usage & flags) == flags) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    CommandQueue& VulkanDevice::GetQueue(GraphicsQueueType::Flags flags) {
+        ZoneScopedVulkan;
+
+        for (const auto& [usage, queue] : m_Queues) {
+            if ((usage & flags) == flags) {
+                return *queue;
+            }
+        }
+
+        throw std::runtime_error("No such queue meets these requirements!");
     }
 } // namespace vox

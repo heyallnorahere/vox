@@ -134,8 +134,14 @@ namespace vox {
 
         CreateInstance();
         CreateDebugMessenger();
-        CreateDevice();
 
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
+        auto window = Application::Get().GetWindow();
+        if (window) {
+            surface = (VkSurfaceKHR)window->CreateVulkanSurface(m_Instance);
+        }
+
+        CreateDevice(surface);
         if (m_Device) {
             VkPhysicalDeviceProperties properties;
             vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &properties);
@@ -144,6 +150,9 @@ namespace vox {
         } else {
             throw std::runtime_error("No viable Vulkan device found!");
         }
+
+        // temporary - we dont have a swapchain yet
+        vkDestroySurfaceKHR(m_Instance, surface, nullptr);
 
         m_ProfilerContext = nullptr;
 
@@ -214,7 +223,7 @@ namespace vox {
                 ZoneScopedNC("Query window surface extensions", VulkanProfilerColor);
 
                 std::vector<std::string> windowExtensions;
-                const auto& window = Application::Get().GetWindow();
+                auto window = Application::Get().GetWindow();
                 window->GetRequiredVulkanExtensions(windowExtensions);
 
                 for (const auto& name : windowExtensions) {
@@ -307,24 +316,12 @@ namespace vox {
         }
     }
 
-    void VulkanRenderer::CreateDevice() {
+    void VulkanRenderer::CreateDevice(VkSurfaceKHR surface) {
         ZoneScopedVulkan;
 
         VkPhysicalDevice selectedDevice = ChoosePhysicalDevice(m_Instance);
         if (selectedDevice == VK_NULL_HANDLE) {
             return;
-        }
-
-        // todo: find present queue
-        std::unordered_map<GraphicsQueueType::QueueType, uint32_t> foundFamilies;
-        if (!VulkanDevice::FindQueueFamilies({ /* GraphicsQueueType::Present */ }, foundFamilies,
-                                             selectedDevice)) {
-            throw std::runtime_error("Failed to find present queue!");
-        }
-
-        std::unordered_set<uint32_t> additionalFamilies;
-        for (const auto& [type, index] : foundFamilies) {
-            additionalFamilies.insert(index);
         }
 
         uint32_t extensionCount;
@@ -339,7 +336,7 @@ namespace vox {
             availableExtensions, s_DeviceExtensions, extensions,
             [](const auto& extension) { return std::string(extension.extensionName); });
 
-        m_Device = Ref<VulkanDevice>::Create(selectedDevice, extensions, additionalFamilies);
+        m_Device = Ref<VulkanDevice>::Create(selectedDevice, surface, extensions);
         volkLoadDevice(m_Device->GetDevice());
     }
 } // namespace vox

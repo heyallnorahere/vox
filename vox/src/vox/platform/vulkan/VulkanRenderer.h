@@ -21,7 +21,7 @@ namespace vox {
     private:
         void CreateInstance();
         void CreateDebugMessenger();
-        void CreateDevice();
+        void CreateDevice(VkSurfaceKHR surface);
 
         VkInstance m_Instance;
         VkDebugUtilsMessengerEXT m_DebugMessenger;

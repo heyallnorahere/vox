@@ -11,6 +11,7 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <queue>
 
 #include <cstdint>
 #include <stddef.h>

@@ -15,7 +15,7 @@ namespace vox {
 
         int Run();
 
-        const Ref<Window>& GetWindow() { return m_Window; }
+        Ref<Window> GetWindow() { return m_Window; }
 
     private:
         Application();
